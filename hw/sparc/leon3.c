@@ -64,6 +64,11 @@ static void main_cpu_reset(void *opaque)
     env->pc     = s->entry;
     env->npc    = s->entry + 4;
     env->regbase[6] = s->sp;
+    if (env->pc) {	/* enable traps and FPU if running a RAM image */
+        env->psret = 1;
+        env->psref = 1;
+        env->wim = 2;
+    }
 }
 
 void leon3_irq_ack(void *irq_manager, int intno)
@@ -141,6 +146,9 @@ static void leon3_generic_hw_init(MachineState *machine)
     reset_info->cpu   = cpu;
     reset_info->sp    = 0x40000000 + ram_size;
     qemu_register_reset(main_cpu_reset, reset_info);
+
+    /* Allocate AHB/APB PNP */
+    grlib_ambapnp_create(0xFFFFF000 /* AHB */, 0x800FF000 /* APB */);
 
     /* Allocate IRQ manager */
     grlib_irqmp_create(0x80000200, env, &cpu_irqs, MAX_PILS, &leon3_set_pil_in);
@@ -220,7 +228,7 @@ static void leon3_generic_hw_init(MachineState *machine)
 
     /* Allocate uart */
     if (serial_hds[0]) {
-        grlib_apbuart_create(0x80000100, serial_hds[0], cpu_irqs[3]);
+        grlib_apbuart_create(0x80000100, serial_hds[0], cpu_irqs, 3);
     }
 }
 
